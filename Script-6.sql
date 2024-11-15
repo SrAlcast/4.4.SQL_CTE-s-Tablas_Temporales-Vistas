@@ -1,6 +1,7 @@
 --Ejercicio 1. Queries Generales
 
 --1.1. Calcula el promedio más bajo y más alto de temperatura.
+
 SELECT 
     MIN(promedio) AS promedio_mas_bajo, 
     MAX(promedio) AS promedio_mas_alto
@@ -10,12 +11,14 @@ FROM (
     GROUP BY id_municipio) AS subquery;
 
 --1.2. Obtén los municipios en los cuales coincidan las medias de la sensación térmica y de la temperatura. 
+
 select id_municipio, avg(sensacion_termica) as sensación_térmica_promedio, AVG(temperatura) as temperatura_promedio
 from tiempo t 
 group by id_municipio 
 having avg(sensacion_termica) = AVG(temperatura)
 
 --1.3. Obtén el local más cercano de cada municipio
+
 SELECT  m.nombre, l.name, l.distance 
 FROM lugar l
 INNER JOIN (
@@ -32,12 +35,12 @@ WHERE l.distance > 2000
 GROUP BY l.id_municipio
 HAVING COUNT(l.id_lugar) >= 25;
 
-
 --1.5. Teniendo en cuenta que el viento se considera leve con una velocidad media de entre 6 y 20 km/h, 
 --moderado con una media de entre 21 y 40 km/h, fuerte con media de entre 41 y 70 km/h y muy fuerte 
 --entre 71 y 120 km/h. Calcula cuántas rachas de cada tipo tenemos en cada uno de los días. 
 --Este ejercicio debes solucionarlo con la sentencia CASE de SQL (no la hemos visto en clase, 
---por lo que tendrás que buscar la documentación). 
+--por lo que tendrás que buscar la documentación).
+
 SELECT fecha,
     SUM(CASE WHEN racha_max BETWEEN 6 AND 20 THEN 1 ELSE 0 END) AS rachas_leves,
     SUM(CASE WHEN racha_max BETWEEN 21 AND 40 THEN 1 ELSE 0 END) AS rachas_moderadas,
@@ -45,8 +48,6 @@ SELECT fecha,
     SUM(CASE WHEN racha_max BETWEEN 71 AND 120 THEN 1 ELSE 0 END) AS rachas_muy_fuertes
 FROM tiempo
 GROUP BY fecha;
-
-
 
 --## Ejercicio 2. Vistas
 --2.1. Crea una vista que muestre la información de los locales que tengan incluido el código postal en su dirección. 
@@ -81,6 +82,7 @@ FROM tiempo t
 JOIN municipios m ON t.id_municipio = m.id_municipio;
 
 --2.5. Obtén una lista con los parques de los municipios que tengan algún castillo.
+
 create view parquecastillo as
 SELECT l.name, STRING_AGG(l.categoria, ' ') AS categorias_asociadas
 FROM lugar l
@@ -92,9 +94,9 @@ HAVING COUNT(DISTINCT l.categoria) = 2;
 --3.1. Crea una tabla temporal que muestre cuántos días han pasado desde que se obtuvo la información de la tabla AEMET.
 
 CREATE TEMPORARY TABLE dias_desde_aemet AS
-SELECT id_tiempo, fecha, CURRENT_DATE - fecha AS dias_desde_registro
+SELECT id_tiempo, fechadia, CURRENT_DATE - fechadia AS dias_desde_registro
 FROM tiempo
-ORDER BY fecha DESC;
+ORDER BY fechadia DESC;
 
 --3.2. Crea una tabla temporal que muestre los locales que tienen más de una categoría asociada e indica el conteo de las mismas
 
@@ -107,50 +109,95 @@ HAVING COUNT(distinct (categoria)) > 1;
 --3.3. Crea una tabla temporal que muestre los tipos de cielo para los cuales la probabilidad de precipitación mínima de los promedios de cada día es 5.
 
 CREATE TEMPORARY TABLE tipos_cielo_probabilidad_5 as
-
 SELECT DISTINCT t.cielo, AVG(t.prob_precip) AS promedio_precip
 FROM tiempo t
-GROUP BY t.fecha, t.cielo
+GROUP BY t.fechadia, t.cielo
 HAVING AVG(t.prob_precip ) = 5;
-
-;
 
 --3.4. Crea una tabla temporal que muestre el tipo de cielo más y menos repetido por municipio.
 
+CREATE TEMPORARY TABLE tipos_cielo_mas_menos_repetido AS
+SELECT DISTINCT t1.id_municipio, 
+       (SELECT t2.cielo 
+        FROM tiempo t2 
+        WHERE t2.id_municipio = t1.id_municipio 
+        GROUP BY t2.cielo 
+        ORDER BY COUNT(*) DESC 
+        LIMIT 1) AS cielo_mas_repetido,
+       (SELECT t3.cielo 
+        FROM tiempo t3 
+        WHERE t3.id_municipio = t1.id_municipio 
+        GROUP BY t3.cielo 
+        ORDER BY COUNT(*) ASC 
+        LIMIT 1) AS cielo_menos_repetido
+FROM tiempo t1;
 
 --## Ejercicio 4. SUBQUERIES
 --4.1. Necesitamos comprobar si hay algún municipio en el cual no tenga ningún local registrado.
 
-
+SELECT id_municipio, nombre
+FROM municipios
+WHERE id_municipio NOT IN (
+    SELECT DISTINCT id_municipio
+    FROM lugar);
 
 --4.2. Averigua si hay alguna fecha en la que el cielo se encuente "Muy nuboso con tormenta".
 
-
+SELECT fechadia,cielo
+FROM tiempo
+WHERE cielo = 'Muy nuboso con tormenta';
 
 --4.3. Encuentra los días en los que los avisos sean diferentes a "Sin riesgo".
 
-
+select distinct fechadia,avisos
+FROM tiempo
+WHERE avisos <> 'Sin riesgo';
 
 --4.4. Selecciona el municipio con mayor número de locales.
 
-
+SELECT id_municipio, COUNT(*) AS numero_locales
+FROM lugar
+GROUP BY id_municipio
+ORDER BY numero_locales DESC
+LIMIT 1;
 
 --4.5. Obtén los municipios muya media de sensación térmica sea mayor que la media total.
 
-
+SELECT id_municipio, AVG(sensacion_termica) AS media_sensacion_municipio
+FROM tiempo
+GROUP BY id_municipio
+HAVING AVG(sensacion_termica) > (
+    SELECT AVG(sensacion_termica)
+    FROM tiempo
+);
 
 --4.6. Selecciona los municipios con más de dos fuentes.
 
-
+SELECT id_municipio, COUNT(*) AS numero_fuentes
+FROM lugar
+WHERE categoria = 'Fountain'
+GROUP BY id_municipio
+HAVING COUNT(*) > 2;
 
 --4.7. Localiza la dirección de todos los estudios de cine que estén abiertod en el municipio de "Madrid".
 
-
+SELECT l.name,l.categoria,l.address,l.closed_bucket
+FROM lugar l
+JOIN municipios m ON l.id_municipio = m.id_municipio
+WHERE l.categoria = 'Film Studio'
+  AND l.closed_bucket IN ('LikelyOpen', 'VeryLikelyOpen')
+  AND m.nombre = 'Madrid';
 
 --4.8. Encuentra la máxima temperatura para cada tipo de cielo.
 
-
+SELECT cielo, MAX(temperatura) AS maxima_temperatura
+FROM tiempo
+GROUP BY cielo;
 
 --4.9. Muestra el número de locales por categoría que muy probablemente se encuentren abiertos.
 
-
+SELECT categoria, COUNT(*) AS numero_locales
+FROM lugar
+WHERE closed_bucket IN ('LikelyOpen', 'VeryLikelyOpen')
+GROUP BY categoria
+ORDER BY numero_locales DESC;
